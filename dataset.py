@@ -283,8 +283,7 @@ class CrossValDataset(Dataset):
         if self.is_cat:
             if self.is_train:
                 tp = transforms.ToTensor()
-                #                tn = transforms.Normalize(mean=[0.41637144, 0.30634253, 0.29954166]                                         std=[0.2364058, 0.17467834, 0.17212286])
-                img_path, label = self.samples[idx]
+                img_path, label = samples[idx]
                 label = torch.tensor(int(label), dtype=torch.long)
                 rgb = Image.open(os.path.join(self.data_folder, img_path)).convert('RGB')
                 nir = Image.open(os.path.join(self.cat_folder, img_path)).convert('RGB')
@@ -294,8 +293,6 @@ class CrossValDataset(Dataset):
                 rgb, nir = rn[0], rn[1]
                 rgb = tp(rgb)
                 nir = tp(nir)
-                #rgb = tn(rgb)
-                #nir = tn(nir)
                 return rgb, nir, label
             else:
                 tp = transforms.ToTensor()
@@ -315,125 +312,3 @@ class CrossValDataset(Dataset):
             rgb = self.transform(rgb)
             return rgb, 1, label
 
-
-class CDDataset(Dataset):
-    def __init__(self, data_folder, transform=None, is_train=True, se=0):
-        super(CDDataset, self).__init__()
-        self.data_folder = data_folder
-        self.samples = []
-        self.transform = transform
-        self.is_train = is_train
-        np.random.seed(se)
-        labels = []
-        label = 0
-        for filename in os.listdir(data_folder):
-            if filename.endswith('.jpg'):
-                if 'Cat' in filename:
-                    label = '1'
-                elif 'Dog' in filename:
-                    label = '0'
-            file_path = os.path.join(data_folder, filename)
-            self.samples.append(file_path)
-            labels.append(label)
-        samples_0 = [(sample, label) for sample, label in zip(self.samples, labels) if label == '0']
-        samples_1 = [(sample, label) for sample, label in zip(self.samples, labels) if label == '1']
-        '''        # 计算每种类别的样本数量
-        n_class_0 = len(samples_0)
-        n_class_1 = len(samples_1)
-        minority_class = min(n_class_0, n_class_1)
-
-        # 欠采样：如果多数类是0，则从0中随机选取等于少数类数量的样本
-        if n_class_0 > n_class_1:
-            samples_0 = np.random.choice(samples_0, size=minority_class, replace=False)
-        elif n_class_1 > n_class_0:  
-            samples_1 = np.random.choice(samples_1, size=minority_class, replace=False)'''
-        # 对两类样本分别进行训练集和验证集的划分
-        train_samples_0, val_samples_0, _, _ = train_test_split([s[0] for s in samples_0],
-                                                                [s[1] for s in samples_0], test_size=0.3, shuffle=True,
-                                                                stratify=[s[1] for s in samples_0]
-                                                                )
-        train_samples_1, val_samples_1, _, _ = train_test_split([s[0] for s in samples_1],
-                                                                [s[1] for s in samples_1], test_size=0.3, shuffle=True,
-                                                                stratify=[s[1] for s in samples_1]
-                                                                )
-
-        # 合并并转换为原始格式
-        train_samples = list(zip(train_samples_0, [0] * len(train_samples_0))) + list(
-            zip(train_samples_1, [1] * len(train_samples_1)))
-        val_samples = list(zip(val_samples_0, [0] * len(val_samples_0))) + list(
-            zip(val_samples_1, [1] * len(val_samples_1)))
-
-        # 打乱数据集
-        np.random.shuffle(train_samples)
-        np.random.shuffle(val_samples)
-        if self.is_train:
-            self.samples = train_samples
-        else:
-            self.samples = val_samples
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        img_path, label = self.samples[idx]
-        label = torch.tensor(int(label), dtype=torch.long)
-        rgb = Image.open(os.path.join(self.data_folder, img_path)).convert('RGB')
-        rgb = self.transform(rgb)
-        return rgb, 1, label
-
-
-def main():
-    RGB_image_path = rf'G:\qiuzehong\RNfusion\data\png\tongue_NIR\res'
-    NIR_image_path = rf'G:\qiuzehong\RNfusion\data\png\tongue_NIR\res'
-    cdimage = rf'G:\qiuzehong\cd'
-    roipath = rf'G:\qiuzehong\RNfusion\data\png\tongue\LABEL'
-    txt_path = rf'G:\qiuzehong\IVIM-VIT\122-0.txt'
-    data_transform = {
-        "train": transforms.Compose([[transforms.RandomHorizontalFlip(),
-                                      transforms.RandomRotation(degrees=(-15, 15)),
-                                      transforms.ToTensor()]]),
-
-        "val": transforms.Compose([
-            transforms.ToTensor()])}
-    random_seed = np.random.randint(0, 10000)
-    dataset_t = MyDataset(RGB_image_path, txt_path, NIR_image_path,
-                          transform=data_transform['train'], is_train=True, is_cat=False, se=42)
-    dataset_t1 = MyDataset(RGB_image_path, txt_path, NIR_image_path,
-                           transform=data_transform['train'], is_train=False, is_cat=False, se=6317)
-    dataset_cd = CDDataset(cdimage, transform=data_transform['train'], is_train=True, se=random_seed)
-    '''s1 = dataset_t.samples
-    s2 = dataset.samples
-    print(s1, s2)
-    # 假设s1和s2分别是两个数据集的samples属性
-    train_ids = {sample[0] for sample in s1}  # 提取训练集样本ID
-    val_ids = {sample[0] for sample in s2}  # 提取验证集样本ID
-
-    # 检查是否有交集
-    common_ids = train_ids & val_ids
-    if common_ids:
-        print("训练集和验证集有相同的样本ID:", common_ids)
-    else:
-        print("训练集和验证集没有相同的样本。")
-    print(dataset)
-    print(len(dataset))'''
-    dataloader = DataLoader(dataset_cd, batch_size=24, shuffle=True, num_workers=1)
-    print(dataloader)
-    if dataset_t1.samples == dataset_t.samples:
-        print('y')
-    # 现在你可以通过遍历dataloader来触发 __getitem__
-    sg = dataset_t1.samples
-    with open('./list.txt', 'a', encoding='utf-8') as file:
-        for i in sg:
-            file.write(i[0] + "_" + str(i[1]) + '\n')
-
-    print(dataset_t.samples)
-    print(dataset_t1.samples)
-    for batch_idx, (images, images1, labels) in enumerate(dataloader):
-        print(f"Batch {batch_idx}")
-
-        # 在这里处理每个批次的数据，例如将其输入到神经网络进行训练或验证
-        # ...
-
-
-if __name__ == '__main__':
-    main()
